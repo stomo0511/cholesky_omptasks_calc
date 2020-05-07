@@ -1,0 +1,4 @@
+CC = mpiicc
+CFLAGS  += -I${MKLROOT}/include -O3 -I./ -std=gnu99  -fopenmp -g
+#LDFLAGS += -std=gnu99 -lrt -lpthread -lm -fopenmp
+LDFLAGS += -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl
