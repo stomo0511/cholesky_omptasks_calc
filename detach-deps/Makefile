@@ -16,15 +16,26 @@ CFLAGS=-fopenmp
 LDFLAGS=-fopenmp
 endif
 
-all : ch_$(TARGET)_fine ch_$(TARGET)_fine_extrae ch_$(TARGET)_fine_timing
-ch_$(TARGET)_fine: ch_ompss.c ch_common.c Makefile libdetach.so
-	$(CC) $(CFLAGS) -o $@ ch_ompss.c -g ch_common.c $(LDFLAGS) -L. -Wl,--rpath,. -ldetach
+ifeq ($(TARGET),ompss2_claix)
+  SRC=ch_ompss.c ch_common.c
+else
+  SRC=ch_ompss.c ch_common.c
+endif
 
-ch_$(TARGET)_fine_extrae: ch_ompss.c ch_common.c Makefile libdetach.so
-	$(CC) $(CFLAGS) -o $@ ch_ompss.c -g ch_common.c $(LDFLAGS) -DUSE_EXTRAE $(EXTRAE_FLAGS) -L. -Wl,--rpath,. -ldetach
 
-ch_$(TARGET)_fine_timing: ch_ompss.c ch_common.c Makefile libdetach.so
-	$(CC) $(CFLAGS) -o $@ ch_ompss.c -g ch_common.c $(LDFLAGS) -DUSE_TIMING -L. -Wl,--rpath,. -ldetach
+#all : ch_$(TARGET)_fine ch_$(TARGET)_fine_extrae ch_$(TARGET)_fine_timing
+all : ch_$(TARGET)_fine ch_$(TARGET)_fine_timing ch_$(TARGET)_fine_poll
+ch_$(TARGET)_fine: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
+	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -L. -Wl,--rpath,. -ldetach_$(TARGET)
+
+ch_$(TARGET)_fine_extrae: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
+	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_EXTRAE $(EXTRAE_FLAGS) -L. -Wl,--rpath,. -ldetach_$(TARGET)
+
+ch_$(TARGET)_fine_timing: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
+	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_TIMING -L. -Wl,--rpath,. -ldetach_$(TARGET)
+
+ch_$(TARGET)_fine_poll: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
+	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_POLLING -L. -Wl,--rpath,. -ldetach_$(TARGET)
 
 clean:
 	rm -f *.o ch_$(TARGET)_fine ch_$(TARGET)_fine_extrae ch_$(TARGET)_fine_timing
@@ -32,6 +43,6 @@ clean:
 cleanall: 
 	rm -f *.o ch_*_fine ch_*_fine_extrae ch_*_fine_timing
 	
-libdetach.so: detach.cpp mpi-detach.h
-	$(MPICXX)  -DOMPI_SKIP_MPICXX=1 -shared -fPIC detach.cpp -o libdetach.so -g
+libdetach_$(TARGET).so: detach.cpp mpi-detach.h Makefile
+	$(MPICXX)  -DOMPI_SKIP_MPICXX=1 -std=c++14 -shared -fPIC detach.cpp -o libdetach_$(TARGET).so -g
 

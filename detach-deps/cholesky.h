@@ -85,7 +85,7 @@ static void BLAS_ge_norm(enum blas_order_type order, enum blas_norm_type norm,
 		for (int i = 0; i < m; ++i) {
 			v = 0.0f;
 			for (int j = 0; j < n; ++j) {
-				v += abs( a[i + j * lda] );
+				v += fabs( a[i + j * lda] );
 			}
 			if (v > anorm)
 				anorm = v;

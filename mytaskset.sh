@@ -1,0 +1,4 @@
+START=$[48/${MPI_LOCALNRANKS}*${MPI_LOCALRANKID}]
+END=$[$START+$OMP_NUM_THREADS-1]
+echo taskset -c $START-$END $@
+taskset -c $START-$END $@

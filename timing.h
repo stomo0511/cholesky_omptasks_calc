@@ -15,6 +15,14 @@ typedef struct perthread_timing {
     double ts[TIME_CNT];
 } perthread_timing_t;
 
+#if USE_NANOS6
+#define THREAD_NUM 1
+#define NUM_THREADS 1
+#else
+#define THREAD_NUM omp_get_thread_num()
+#define NUM_THREADS omp_get_num_threads()
+#endif
+
 #ifdef USE_TIMING
 
 #define INIT_TIMING(nthreads) \
@@ -29,15 +37,14 @@ typedef struct perthread_timing {
 
 #define PRINT_TIMINGS() do { \
     perthread_timing_t acc_timings; \
-    ACCUMULATE_TIMINGS(omp_get_num_threads(), acc_timings); \
+    ACCUMULATE_TIMINGS(NUM_THREADS, acc_timings); \
     if (mype==0) MPI_Reduce(MPI_IN_PLACE, acc_timings.ts, TIME_CNT, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); \
     else         MPI_Reduce(acc_timings.ts, NULL, TIME_CNT, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); \
-    printf("[%d] potrf:%f:trsm:%f:gemm:%f:syrk:%f:comm:%f:create:%f:total:%f:wall:%f\n", mype, acc_timings.ts[TIME_POTRF], acc_timings.ts[TIME_TRSM],acc_timings.ts[TIME_GEMM],acc_timings.ts[TIME_SYRK],acc_timings.ts[TIME_COMM],acc_timings.ts[TIME_CREATE],acc_timings.ts[TIME_TOTAL], acc_timings.ts[TIME_TOTAL]*omp_get_num_threads()); \
+    printf("[%d] potrf:%f:trsm:%f:gemm:%f:syrk:%f:comm:%f:create:%f:non-calc:%f:total:%f:wall:%f\n", mype, acc_timings.ts[TIME_POTRF], acc_timings.ts[TIME_TRSM],acc_timings.ts[TIME_GEMM],acc_timings.ts[TIME_SYRK],acc_timings.ts[TIME_COMM],acc_timings.ts[TIME_CREATE], acc_timings.ts[TIME_TOTAL]*NUM_THREADS-acc_timings.ts[TIME_POTRF]-acc_timings.ts[TIME_TRSM]-acc_timings.ts[TIME_GEMM]-acc_timings.ts[TIME_SYRK] ,acc_timings.ts[TIME_TOTAL], acc_timings.ts[TIME_TOTAL]*NUM_THREADS); \
   } while(0)
 
 #define FREE_TIMING() free(__timing)
 
-#define THREAD_NUM omp_get_thread_num()
 
 #define START_TIMING(timer) double __ts_##timer = timestamp(); int __timer = timer;
 #define END_TIMING(timer) __timing[THREAD_NUM].ts[timer] += timestamp() - __ts_##timer
@@ -56,7 +63,11 @@ static void wait_impl(MPI_Request *comm_req, double *timer)
     MPI_Test(comm_req, &comm_comp, MPI_STATUS_IGNORE);
     while (!comm_comp) {
         double yield_time = timestamp();
+#ifdef USE_NANOS6
+//#pragma oss taskyield
+#else
 #pragma omp taskyield
+#endif
         *timer -= timestamp() - yield_time;
         MPI_Test(comm_req, &comm_comp, MPI_STATUS_IGNORE);
     }
@@ -69,7 +80,11 @@ static void waitall_impl(MPI_Request *comm_req, int nreq, double *timer)
     MPI_Testall(nreq, comm_req, &comm_comp, MPI_STATUS_IGNORE);
     while (!comm_comp) {
         double yield_time = timestamp();
+#ifdef USE_NANOS6
+//#pragma oss taskyield
+#else
 #pragma omp taskyield
+#endif
         *timer -= timestamp() - yield_time;
         MPI_Testall(nreq, comm_req, &comm_comp, MPI_STATUS_IGNORE);
     }
