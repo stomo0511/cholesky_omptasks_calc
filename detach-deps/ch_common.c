@@ -200,10 +200,10 @@ int main(int argc, char *argv[])
 {
     // add to diagonal
     if (check) {
-      Ans[i][i][i*ts+i] = (double)nt;
+      Ans[i][i][ts/2*ts+ts/2] = (double)nt;
     }
     if (block_rank[i*nt+i] == mype) {
-      A[i][i][i*ts+i] = (double)nt;
+      A[i][i][ts/2*ts+ts/2] = (double)nt;
     }
 }
   }
@@ -280,6 +280,9 @@ static void get_block_rank(int *block_rank, int nt)
 {
     int row, col;
     row = col = np;
+    int blocks[np];
+    for (int i=0; i<np; i++)
+        blocks[i]=0;
 
     if (np != 1) {
         while (1) {
@@ -295,10 +298,14 @@ static void get_block_rank(int *block_rank, int nt)
     for (i = 0; i < nt; i++) {
         for (j = 0; j < nt; j++) {
             block_rank[i*nt + j] = tmp_rank + offset;
+            blocks[tmp_rank + offset]++;
             tmp_rank++;
             if (tmp_rank >= col) tmp_rank = 0;
         }
         tmp_rank = 0;
         offset = (offset + col >= np) ? 0 : offset + col;
     }
+    if (mype == 0) 
+      for (int i=0; i<np; i++)
+        printf("blocks[%i]=%i\n", i, blocks[i]);
 }

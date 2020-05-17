@@ -35,13 +35,7 @@ static int comm_round_sentinel; // <-- used to limit parallel communication task
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, double *C[nt], int *block_rank)
 {
 	REGISTER_EXTRAE();
-
-#ifndef USE_NANOS6
-#pragma omp parallel
-#pragma omp single
-#endif
-{
-    INIT_TIMING(NUM_THREADS);
+        INIT_TIMING(MAX_THREADS);
     char *send_flags = malloc(sizeof(char) * np);
     char recv_flag = 0;
     int num_send_tasks = 0;
@@ -50,6 +44,12 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
     int max_recv_tasks = 0;
     int num_comp_tasks = 0;
     reset_send_flags(send_flags);
+
+#ifndef USE_NANOS6
+#pragma omp parallel
+#pragma omp single
+#endif
+{
 
     START_TIMING(TIME_TOTAL);
     {
@@ -350,6 +350,8 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 #endif
     END_TIMING(TIME_TOTAL);
     MPI_Barrier(MPI_COMM_WORLD);
+// pragma omp single
+}// pragma omp parallel
 #ifdef USE_TIMING
 	PRINT_TIMINGS();
 	FREE_TIMING();
@@ -359,7 +361,5 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 
     free(send_flags);
 
-// pragma omp single
-}// pragma omp parallel
 }
 

@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jube>
+  <benchmark name="parameterspace" outpath="bench_run">
+    <comment>Parameters for Cholesky Experiment</comment>
+    
+    <!-- Configuration -->
+    <parameterset name="run_node_set">
+      <!--<parameter name="procs" type="int">1,2,4,8,16,32,64</parameter>-->
+      <parameter name="procs" type="int">1,2,4,8,16</parameter>
+      <parameter name="threads" type="int" mode="python">int(48/${procs})</parameter>
+      <parameter name="problem">32768 256 0</parameter>
+      <parameter name="jobname">run_node</parameter>
+    </parameterset>
+
+    <parameterset name="run_scale_set">
+      <!--<parameter name="procs" type="int">1,2,4,8,16,32,64</parameter>-->
+      <parameter name="procs" type="int">4,8,16,32,64,128</parameter>
+      <parameter name="threads" type="int">12</parameter>
+      <parameter name="problem">65536 256 0</parameter>
+      <parameter name="jobname">run_scale</parameter>
+    </parameterset>
+
+
+
+    <parameterset name="app_set">
+      <parameter name="app">single,taskyield,detached,detached-poll</parameter>
+<!--      <parameter name="app">taskyield</parameter>-->
+      <parameter name="path" mode="python">
+        {'single': 'singlecom-deps',
+         'taskyield' : 'fine-deps',
+         'detached': 'detach-deps',
+         'detached-poll': 'detach-deps'
+        }.get('${app}')
+      </parameter>
+      <parameter name="exe" mode="python">
+        {'single': 'ch_${compiler}_${system}_single_timing',
+         'taskyield' : 'ch_${compiler}_${system}_fine_timing',
+         'detached': 'ch_${compiler}_${system}_fine_timing',
+         'detached-poll': 'ch_${compiler}_${system}_fine_poll'
+        }.get('${app}')
+      </parameter>
+<!--    We leave out intel because of the task queue bug (deadlocks) -->
+      <parameter name="compiler" mode="python">
+        {'single': 'clang,ompss',
+         'taskyield' : 'ompss',
+         'detached': 'clang,ompss2',
+         'detached-poll': 'ompss2'
+        }.get('${app}')
+      </parameter>
+<!--      <parameter name="compiler" mode="python">
+        {'single': 'intel,clang,ompss',
+         'taskyield' : 'ompss',
+         'detached': 'clang,ompss2',
+         'detached-poll': 'ompss2'
+        }.get('${app}')
+      </parameter>-->
+      <parameter name="modules" mode="python">
+        {'intel': 'module purge; module use /home/pj416018/.modules; module load DEVELOP DEV-TOOLS intel intelmpi gcc/9',
+         'clang' : 'module purge; module use /home/pj416018/.modules; module load DEVELOP DEV-TOOLS clang/10.0-master intelmpi',
+         'ompss': 'module purge; module use /home/pj416018/.modules; module load DEVELOP DEV-TOOLS intel intelmpi gcc/9 ompss',
+         'ompss2': 'module purge; module use /home/pj416018/.modules; module load DEVELOP DEV-TOOLS intel intelmpi gcc/9 ompss-2',
+        }.get('${compiler}')
+      </parameter>
+      <parameter name="system">claix</parameter>
+      <parameter name="exports" mode="python">
+        {'single': '',
+         'taskyield' : '',
+         'detached': 'export MPIX_DETACH=progress',
+         'detached-poll': ''
+        }.get('${app}')
+      </parameter>
+    </parameterset>
+
+    <!-- build code -->
+    <step name="build">
+      <use>app_set</use> <!-- use existing parameterset -->
+      <do>rsync -a ${jube_benchmark_home}/../${compiler}_${system}.def ${jube_benchmark_home}/../*.h  ${jube_benchmark_home}/../${path} .</do>
+      <do>cd ${path}; ${modules}; make TARGET=${compiler}_${system}</do>
+    </step>
+
+    <!-- Job configuration -->
+    <parameterset name="executeset">
+      <parameter name="submit_cmd">sbatch</parameter>
+      <parameter name="job_file">claix.run</parameter>
+      <parameter name="walltime">00:10:00</parameter>
+      <parameter name="mail_address"></parameter>
+      <parameter name="err_file">stderr</parameter>
+      <parameter name="out_file">stdout</parameter>
+      <parameter name="ready_file">ready</parameter>
+    </parameterset>
+    
+    <!-- Load jobfile -->
+    <fileset name="files">
+      <copy>${job_file}.in</copy>
+    </fileset>
+    
+    <!-- Substitute jobfile -->
+    <substituteset name="sub_job">
+      <iofile in="${job_file}.in" out="$job_file" />
+      <sub source="#TASKS#" dest="$procs" />
+      <sub source="#NAME#" dest="$jobname" />
+      <sub source="#NTHREADS#" dest="$threads" />
+      <sub source="#TIME_LIMIT#" dest="$walltime" />
+      <sub source="#STDOUTLOGFILE#" dest="$out_file" />
+      <sub source="#STDERRLOGFILE#" dest="$err_file" />
+      <sub source="#ENV#" dest="$modules;$exports" />
+      <sub source="#EXEC#" dest="./build/${path}/${exe}" />
+      <sub source="#READY#" dest="$ready_file" />
+      <sub source="#ARGS#" dest="$problem" />
+    </substituteset> 
+         
+    <!-- run jobs -->
+    <step name="run_node" depend="build" iterations="10"  tag="!strong|!weak">
+      <use>app_set</use>
+      <use>run_node_set</use>
+      <use>executeset</use>
+      <use>files,sub_job</use>
+      <do done_file="$ready_file">$submit_cmd $job_file</do> <!-- shell command -->
+    </step>    
+    
+    <step name="run_scale" depend="build" iterations="10" tag="!weak|!node">
+      <use>app_set</use>
+      <use>run_scale_set</use>
+      <use>executeset</use>
+      <use>files,sub_job</use>
+      <do done_file="$ready_file">$submit_cmd $job_file</do> <!-- shell command -->
+    </step>    
+    
+<!--    <step name="run_weak" depend="build" iterations="5" tag="!strong|!node">
+      <use>app_set</use>
+      <use>run_weak_set</use>
+      <use>executeset</use>
+      <use>files,sub_job</use>
+      <do done_file="$ready_file">$submit_cmd $job_file</do>
+    </step>    -->
+    
+    <patternset name="cholesky_time">
+      <pattern name="ch_time" type="float">time:${jube_pat_fp}:gflops_ser</pattern>
+      <pattern name="ch_mype" type="int">mype:${jube_pat_bl}${jube_pat_int}:np</pattern>
+      <pattern name="ch_nthreads" type="int">threads:${jube_pat_bl}${jube_pat_int}:result</pattern>
+      <!-- [total] potrf:0.005729:trsm:1.010539:gemm:42.134603:syrk:1.095475:comm:2.549706:create:0.170726:non-calc:19.777753:total:10.670683:wall:64.024099 -->
+      <pattern name="total_potrf" type="float">\[total\].*potrf:${jube_pat_fp}:</pattern>
+      <pattern name="total_trsm" type="float">\[total\].*trsm:${jube_pat_fp}:</pattern>
+      <pattern name="total_gemm" type="float">\[total\].*gemm:${jube_pat_fp}:</pattern>
+      <pattern name="total_syrk" type="float">\[total\].*syrk:${jube_pat_fp}:</pattern>
+      <pattern name="total_comm" type="float">\[total\].*comm:${jube_pat_fp}:</pattern>
+      <pattern name="total_create" type="float">\[total\].*create:${jube_pat_fp}:</pattern>
+      <pattern name="total_noncalc" type="float">\[total\].*non-calc:${jube_pat_fp}:</pattern>
+      <pattern name="total_total" type="float">\[total\].*total:${jube_pat_fp}:</pattern>
+      <pattern name="total_wall" type="float">\[total\].*wall:${jube_pat_fp}</pattern>
+      <pattern name="ch_potrf" type="float">\[${jube_pat_nint}\].*potrf:${jube_pat_fp}:</pattern>
+      <pattern name="ch_trsm" type="float">\[${jube_pat_nint}\].*trsm:${jube_pat_fp}:</pattern>
+      <pattern name="ch_gemm" type="float">\[${jube_pat_nint}\].*gemm:${jube_pat_fp}:</pattern>
+      <pattern name="ch_syrk" type="float">\[${jube_pat_nint}\].*syrk:${jube_pat_fp}:</pattern>
+      <pattern name="ch_comm" type="float">\[${jube_pat_nint}\].*comm:${jube_pat_fp}:</pattern>
+      <pattern name="ch_create" type="float">\[${jube_pat_nint}\].*create:${jube_pat_fp}:</pattern>
+      <pattern name="ch_noncalc" type="float">\[${jube_pat_nint}\].*non-calc:${jube_pat_fp}:</pattern>
+      <pattern name="ch_total" type="float">\[${jube_pat_nint}\].*total:${jube_pat_fp}:</pattern>
+      <pattern name="ch_wall" type="float">\[${jube_pat_nint}\].*wall:${jube_pat_fp}</pattern>
+    </patternset>
+    
+    <analyser name="node_analyser" reduce="true">
+            <use>cholesky_time</use>
+            <analyse step="run_node">
+                <file>${out_file}</file>
+            </analyse>
+    </analyser>
+    <analyser name="scale_analyser" reduce="true">
+            <use>cholesky_time</use>
+            <analyse step="run_scale">
+                <file>${out_file}</file>
+            </analyse>
+    </analyser>
+    <result>
+	<use>node_analyser</use>
+	<table name="node_csv" style="csv">
+    <include from="table.xml" path="column" />
+        </table>
+    </result>
+    <result>
+	<use>scale_analyser</use>
+	<table name="scale_csv" style="csv">
+    <include from="table.xml" path="column" />
+        </table>
+    </result>
+  </benchmark>
+</jube>

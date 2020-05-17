@@ -6,7 +6,7 @@ typedef void MPIX_Detach_all_callback_statuses_function(void *, int count, MPI_R
 
 // lazy for compatibility
 typedef MPIX_Detach_callback_function MPIX_Detach_callback;
-typedef MPIX_Detach_callback_status_functionMPIX_Detach_callback_status;
+typedef MPIX_Detach_callback_status_function MPIX_Detach_callback_status;
 typedef MPIX_Detach_all_callback_function MPIX_Detach_all_callback;
 typedef MPIX_Detach_all_callback_statuses_function MPIX_Detach_all_callback_statuses;
 

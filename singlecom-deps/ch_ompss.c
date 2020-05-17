@@ -11,11 +11,11 @@
 
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, double *C[nt], int *block_rank)
 {
+	INIT_TIMING(omp_get_max_threads());
 #pragma omp parallel
 {
 #pragma omp single
 {
-	INIT_TIMING(omp_get_num_threads());
     START_TIMING(TIME_TOTAL);
     {
     START_TIMING(TIME_CREATE);
@@ -219,10 +219,10 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 #pragma omp taskwait
     END_TIMING(TIME_TOTAL);
     MPI_Barrier(MPI_COMM_WORLD);
-	PRINT_TIMINGS();
-	FREE_TIMING();
 
 }// pragma omp single
 }// pragma omp parallel
+	PRINT_TIMINGS();
+	FREE_TIMING();
 }
 

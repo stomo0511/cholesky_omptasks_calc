@@ -149,7 +149,7 @@ void run(void) {
         }
     } while (running && singleRequests.empty() && allRequests.empty());
     MPIX_Progress(NULL);
-    std::this_thread::sleep_for(.5ms);
+    std::this_thread::sleep_for(.1ms);
   }
 }
 

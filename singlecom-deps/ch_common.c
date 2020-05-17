@@ -160,10 +160,10 @@ int main(int argc, char *argv[])
 {
     // add to diagonal
     if (check) {
-      Ans[i][i][i*ts+i] = (double)nt;
+      Ans[i][i][ts/2*ts+ts/2] = (double)nt;
     }
     if (block_rank[i*nt+i] == mype) {
-      A[i][i][i*ts+i] = (double)nt;
+      A[i][i][ts/2*ts+ts/2] = (double)nt;
     }
 }
   }
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
   }
 
 #pragma omp single
-    num_threads = omp_get_num_threads();
+    num_threads = omp_get_max_threads();
 
     const float t3 = get_time();
     if (check) cholesky_single(ts, nt, (double* (*)[nt]) Ans);

@@ -16,11 +16,26 @@ typedef struct perthread_timing {
 } perthread_timing_t;
 
 #if USE_NANOS6
-#define THREAD_NUM 1
-#define NUM_THREADS 1
+static uint64_t ID = 0;
+static uint64_t my_next_id() {
+  uint64_t ret = __sync_fetch_and_add(&ID, 1);
+  return ret;
+}
+static int get_thread_num(){
+  static __thread int thread_num=-1;
+  if (thread_num==-1) thread_num=my_next_id();
+  return thread_num;
+}
+static int get_num_threads(){
+  return ID;
+}
+#define THREAD_NUM get_thread_num()
+#define NUM_THREADS get_num_threads()
+#define MAX_THREADS 50
 #else
 #define THREAD_NUM omp_get_thread_num()
-#define NUM_THREADS omp_get_num_threads()
+#define NUM_THREADS omp_get_max_threads()
+#define MAX_THREADS omp_get_max_threads()
 #endif
 
 #ifdef USE_TIMING
@@ -38,9 +53,10 @@ typedef struct perthread_timing {
 #define PRINT_TIMINGS() do { \
     perthread_timing_t acc_timings; \
     ACCUMULATE_TIMINGS(NUM_THREADS, acc_timings); \
+    printf("[%d] potrf:%f:trsm:%f:gemm:%f:syrk:%f:comm:%f:create:%f:non-calc:%f:total:%f:wall:%f\n", mype, acc_timings.ts[TIME_POTRF], acc_timings.ts[TIME_TRSM],acc_timings.ts[TIME_GEMM],acc_timings.ts[TIME_SYRK],acc_timings.ts[TIME_COMM],acc_timings.ts[TIME_CREATE], acc_timings.ts[TIME_TOTAL]*NUM_THREADS-acc_timings.ts[TIME_POTRF]-acc_timings.ts[TIME_TRSM]-acc_timings.ts[TIME_GEMM]-acc_timings.ts[TIME_SYRK] ,acc_timings.ts[TIME_TOTAL], acc_timings.ts[TIME_TOTAL]*NUM_THREADS); \
     if (mype==0) MPI_Reduce(MPI_IN_PLACE, acc_timings.ts, TIME_CNT, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); \
     else         MPI_Reduce(acc_timings.ts, NULL, TIME_CNT, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); \
-    printf("[%d] potrf:%f:trsm:%f:gemm:%f:syrk:%f:comm:%f:create:%f:non-calc:%f:total:%f:wall:%f\n", mype, acc_timings.ts[TIME_POTRF], acc_timings.ts[TIME_TRSM],acc_timings.ts[TIME_GEMM],acc_timings.ts[TIME_SYRK],acc_timings.ts[TIME_COMM],acc_timings.ts[TIME_CREATE], acc_timings.ts[TIME_TOTAL]*NUM_THREADS-acc_timings.ts[TIME_POTRF]-acc_timings.ts[TIME_TRSM]-acc_timings.ts[TIME_GEMM]-acc_timings.ts[TIME_SYRK] ,acc_timings.ts[TIME_TOTAL], acc_timings.ts[TIME_TOTAL]*NUM_THREADS); \
+    if (mype==0) printf("[total] potrf:%f:trsm:%f:gemm:%f:syrk:%f:comm:%f:create:%f:non-calc:%f:total:%f:wall:%f\n", acc_timings.ts[TIME_POTRF], acc_timings.ts[TIME_TRSM],acc_timings.ts[TIME_GEMM],acc_timings.ts[TIME_SYRK],acc_timings.ts[TIME_COMM],acc_timings.ts[TIME_CREATE], acc_timings.ts[TIME_TOTAL]*NUM_THREADS-acc_timings.ts[TIME_POTRF]-acc_timings.ts[TIME_TRSM]-acc_timings.ts[TIME_GEMM]-acc_timings.ts[TIME_SYRK] ,acc_timings.ts[TIME_TOTAL], acc_timings.ts[TIME_TOTAL]*NUM_THREADS); \
   } while(0)
 
 #define FREE_TIMING() free(__timing)

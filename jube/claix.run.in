@@ -1,0 +1,17 @@
+#!/bin/bash -x
+#SBATCH --job-name=#NAME#
+#SBATCH --ntasks=#TASKS#
+#SBATCH --cpus-per-task=#NTHREADS#
+#SBATCH --time=#TIME_LIMIT#
+#SBATCH --output=#STDOUTLOGFILE#
+#SBATCH --error=#STDERRLOGFILE#
+#SBATCH --exclusive
+####SBATCH --account=jara0001
+
+#ENV#
+
+module li
+
+export OMP_NUM_THREADS=#NTHREADS#
+srun #EXEC# #ARGS#
+touch #READY#
