@@ -1,0 +1,4 @@
+CC = scorep --keep-files mpiicc
+MKLROOT = /opt/intel/Compiler/19.0/1.144/rwthlnk/mkl/
+CFLAGS  += -I$(MKLROOT)/include -O3 -I./ -std=gnu99  -fopenmp -lomp -g
+LDFLAGS += -L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lm -ldl

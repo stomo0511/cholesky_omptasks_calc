@@ -1,3 +1,4 @@
+#include <mpi.h>
 
 enum {
     TIME_POTRF = 0,
