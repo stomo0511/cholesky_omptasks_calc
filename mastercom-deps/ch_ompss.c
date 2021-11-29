@@ -6,15 +6,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ch_common.h"
 #include "../timing.h"
+#include "ch_common.h"
+
+//#define SINGLE_TASKWAIT 1
 
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                   double *C[nt], int *block_rank) {
   INIT_TIMING(omp_get_max_threads());
 #pragma omp parallel
   {
-#pragma omp single
+#pragma omp master
     {
       START_TIMING(TIME_TOTAL);
       {
@@ -32,10 +34,12 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
 
           int comm_sentinel; // <-- sentinel, never actual referenced
 
+#ifdef SINGLE_TASKWAIT
+#pragma omp taskwait
+#endif
           if (block_rank[k * nt + k] == mype && np != 1) {
             // use comm_sentinel to make sure this task runs before the
             // communication tasks below
-#pragma omp task depend(in : A[k][k], comm_sentinel) firstprivate(k)
             {
               // printf("Communicating potrf in k=%d\n", k);
               START_TIMING(TIME_COMM);
@@ -54,6 +58,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
               for (int dst = 0; dst < np; dst++) {
                 if (send_flags[dst] && dst != mype) {
                   MPI_Request send_req;
+#ifndef SINGLE_TASKWAIT
+#pragma omp taskwait depend(in:A[k][k])
+#endif
                   // printf("Sending potrf block to %d in k=%d\n", dst, k);
                   MPI_Isend(A[k][k], ts * ts, MPI_DOUBLE, dst, k * nt + k,
                             MPI_COMM_WORLD, &send_req);
@@ -61,14 +68,13 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                 }
               }
               // printf("Waiting for potrf block in k=%d\n", k);
-              waitall(reqs, nreqs);
+              MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
               free(reqs);
               END_TIMING(TIME_COMM);
             }
           } else if (block_rank[k * nt + k] != mype) {
             // use comm_sentinel to make sure this task runs before the
             // communication tasks below
-#pragma omp task depend(out : B) depend(in : comm_sentinel) firstprivate(k)
             {
               START_TIMING(TIME_COMM);
               int recv_flag = 0;
@@ -84,7 +90,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                           k * nt + k, MPI_COMM_WORLD, &recv_req);
                 // printf("Receiving potrf block from %d in k=%d\n",
                 // block_rank[k*nt+k], k);
-                waitall(&recv_req, 1);
+                MPI_Wait(&recv_req, MPI_STATUS_IGNORE);
               }
               END_TIMING(TIME_COMM);
             }
@@ -116,7 +122,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
             }
           }
 
-#pragma omp task depend(inout : comm_sentinel) firstprivate(k) shared(A)
+#ifdef SINGLE_TASKWAIT
+#pragma omp taskwait
+#endif
           {
             START_TIMING(TIME_COMM);
             char send_flags[np];
@@ -142,6 +150,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                 for (int dst = 0; dst < np; dst++) {
                   if (send_flags[dst] && dst != mype) {
                     MPI_Request send_req;
+#ifndef SINGLE_TASKWAIT
+#pragma omp taskwait depend(in:A[k][i])
+#endif
                     MPI_Isend(A[k][i], ts * ts, MPI_DOUBLE, dst, k * nt + i,
                               MPI_COMM_WORLD, &send_req);
                     reqs[nreqs++] = send_req;
@@ -171,7 +182,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
             }
 
             // printf("Waiting for trsm blocks in k=%d\n", k);
-            waitall(reqs, nreqs);
+            MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
             free(reqs);
             END_TIMING(TIME_COMM);
           }

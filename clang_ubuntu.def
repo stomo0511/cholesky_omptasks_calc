@@ -1,0 +1,6 @@
+CC = mpicc -cc=clang
+CXX = mpiCC -cxx=clang++
+MPICXX = $(CXX)
+#MKLROOT = /opt/intel/Compiler/19.0/1.144/rwthlnk/mkl/
+CFLAGS  += -I/usr/include/mkl -O3 -I./ -std=gnu99  -fopenmp -g -fopenmp-version=50
+LDFLAGS += -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl
