@@ -9,7 +9,7 @@
 #include "../timing.h"
 #include "ch_common.h"
 
-//#define SINGLE_TASKWAIT 1
+#define SINGLE_TASKWAIT 1
 
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                   double *C[nt], int *block_rank) {

@@ -292,11 +292,11 @@ int MPIX_Detach_all_status(int count, MPI_Request array_of_requests[],
   return MPI_SUCCESS;
 }
 
-int MPI_Finalize(){
+int MPIX_Detach_Finalize(){
   // we need to make sure, all communication is finished 
   // before calling MPI_Finalize
   if (initialized)
     finiDetach();
  
-  return PMPI_Finalize();
+  return MPI_SUCCESS;
 }

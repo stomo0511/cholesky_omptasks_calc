@@ -274,7 +274,7 @@ int main(int argc, char *argv[]) {
   }
   free(B);
   free(block_rank);
-
+  MPIX_Detach_Finalize();
   MPI_Finalize();
 
   return 0;

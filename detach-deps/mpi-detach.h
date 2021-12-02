@@ -39,6 +39,7 @@ int MPIX_Detach_all_status(int count, MPI_Request array_of_requests[],
                            MPIX_Detach_all_callback_statuses *callback,
                            void *data);
 
+int MPIX_Detach_Finalize();
 int MPIX_Progress(void *);
 
 #ifdef __cplusplus
