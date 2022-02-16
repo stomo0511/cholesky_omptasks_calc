@@ -21,6 +21,7 @@ static int
 
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                   double *C[nt], int *block_rank) {
+  omp_control_tool(omp_control_tool_start, 0, NULL);
   REGISTER_EXTRAE();
   INIT_TIMING(MAX_THREADS);
   char *send_flags = malloc(sizeof(char) * np);
@@ -55,6 +56,8 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
           {
             EXTRAE_ENTER(EVENT_POTRF);
             START_TIMING(TIME_POTRF);
+//            if (k%10)
+              printf("Executing omp_potrf(A[%i][%i])\n",k,k);
             omp_potrf(A[k][k], ts, ts);
             END_TIMING(TIME_POTRF);
             EXTRAE_EXIT(EVENT_POTRF);
@@ -312,6 +315,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
   PRINT_TIMINGS();
   FREE_TIMING();
 #endif
+  omp_control_tool(omp_control_tool_end, 0, NULL);
   printf("[%d] max_send_tasks %d, max_recv_tasks %d, num_send_tasks %d, "
          "num_recv_tasks %d, num_comp_tasks %d\n",
          mype, max_send_tasks, max_recv_tasks, num_send_tasks, num_recv_tasks,

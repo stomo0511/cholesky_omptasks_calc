@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
     MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &C[i]);
   }
 
-#pragma omp single
+//#pragma omp single
   num_threads = omp_get_max_threads();
 
   const float t3 = get_time();
@@ -187,9 +187,11 @@ int main(int argc, char *argv[]) {
 
   if (mype == 0)
     printf("Starting parallel computation\n");
+  omp_control_tool(omp_control_tool_start, 0, NULL);
   const float t1 = get_time();
   cholesky_mpi(ts, nt, (double *(*)[nt])A, B, C, block_rank);
   const float t2 = get_time() - t1;
+  omp_control_tool(omp_control_tool_end, 0, NULL);
   if (mype == 0)
     printf("Finished parallel computation\n");
 

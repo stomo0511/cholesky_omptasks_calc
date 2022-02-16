@@ -2,6 +2,9 @@
 #define _BENCH_CHOLESKY_COMMON_
 
 #include <mkl.h>
+#ifdef FAKEMPI
+#include "fakempi.h"
+#endif
 #include <mpi.h>
 
 //#define DEBUG

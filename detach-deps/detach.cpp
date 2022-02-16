@@ -95,8 +95,8 @@ int MPIX_Progress(void* arg) {
   }
   if (!singleRequests.empty()) {
     auto iter = singleRequests.begin();
-    auto end = singleRequests.end();
-    while (iter != end) {
+    //auto end = singleRequests.end();
+    while (iter != singleRequests.end()) {
       int flag;
       MPI_Test(&(*iter)->req, &flag, (*iter)->statusP);
       if (flag) { //
@@ -113,8 +113,8 @@ int MPIX_Progress(void* arg) {
   }
   if (!allRequests.empty()){
     auto iter = allRequests.begin();
-    auto end = allRequests.end();
-    while (iter != end) {
+    //auto end = allRequests.end();
+    while (iter != allRequests.end()) {
       int flag;
       MPI_Testall((*iter)->count, (*iter)->req, &flag, (*iter)->statuses);
       if (flag) { //

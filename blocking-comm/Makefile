@@ -17,6 +17,8 @@ CFLAGS=-fopenmp
 LDFLAGS=-fopenmp
 endif
 
+#CFLAGS+= -DFAKEMPI -L/home/pj416018/sw/UTIL/clang -Wl,--rpath,/home/pj416018/sw/UTIL/clang -lompt_fakempicriticalpath
+#CFLAGS+= 
 
 all : ch_$(TARGET)_single ch_$(TARGET)_single_noyield ch_$(TARGET)_single_timing Makefile
 ch_$(TARGET)_single: cholesky.c ch_common.c Makefile

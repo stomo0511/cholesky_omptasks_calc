@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
   /* MPI Initialize */
   int provided;
 
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-  if (provided != MPI_THREAD_MULTIPLE) {
-    printf("This Compiler does not support MPI_THREAD_MULTIPLE\n");
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+  if (provided != MPI_THREAD_SERIALIZED) {
+    printf("This Compiler does not support MPI_THREAD_SERIALIZED\n");
     exit(0);
   }
 

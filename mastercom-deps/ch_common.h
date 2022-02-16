@@ -30,7 +30,6 @@ void omp_trsm(double *A, double *B, int ts, int ld);
 void omp_gemm(double *A, double *B, double *C, int ts, int ld);
 void omp_syrk(double *A, double *B, int ts, int ld);
 
-#if 0
 inline static void waitall(MPI_Request *comm_req, int n) {
 #ifdef DISABLE_TASKYIELD
   MPI_Waitall(n, comm_req, MPI_STATUSES_IGNORE);
@@ -45,7 +44,6 @@ inline static void waitall(MPI_Request *comm_req, int n) {
   }
 #endif
 }
-#endif
 void reset_send_flags(char *send_flags);
 
 #ifdef MAIN

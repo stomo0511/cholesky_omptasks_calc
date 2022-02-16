@@ -2,5 +2,6 @@ CC = mpigcc -cc=clang
 CXX = mpigxx -cxx=clang++
 MPICXX = $(CXX)
 MKLROOT = /opt/intel/Compiler/19.0/1.144/rwthlnk/mkl/
-CFLAGS  += -I$(MKLROOT)/include -O3 -I./ -std=gnu99  -fopenmp -g -fopenmp-version=50
-LDFLAGS += -L$(MKLROOT)/lib/intel64 -Wl,--rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl
+CFLAGS  += -I$(MKLROOT)/include -O3 -I./ -std=gnu99  -fopenmp -g -fno-omit-frame-pointer -fopenmp-version=50
+LDFLAGS += -L$(MKLROOT)/lib/intel64 -Wl,--rpath,$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl 
+#-Wl,-no-as-needed -fsanitize=address

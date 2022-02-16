@@ -12,6 +12,7 @@
 
 void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                   double *C[nt], int *block_rank) {
+  omp_control_tool(omp_control_tool_start, 0, NULL);
   INIT_TIMING(omp_get_max_threads());
 #pragma omp parallel
   {
@@ -26,6 +27,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
             //#pragma omp task depend(out: A[k][k]) firstprivate(k)
             //{
             START_TIMING(TIME_POTRF);
+            printf("Executing omp_potrf(A[%i][%i])\n",k,k);
             omp_potrf(A[k][k], ts, ts);
             END_TIMING(TIME_POTRF);
             //}
@@ -289,4 +291,5 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
   }   // pragma omp parallel
   PRINT_TIMINGS();
   FREE_TIMING();
+  omp_control_tool(omp_control_tool_end, 0, NULL);
 }

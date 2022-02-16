@@ -6,8 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../timing.h"
 #include "ch_common.h"
+#include "../timing.h"
 
 #define SINGLE_TASKWAIT 1
 
