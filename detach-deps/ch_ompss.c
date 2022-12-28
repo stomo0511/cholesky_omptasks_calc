@@ -11,9 +11,14 @@
 #include "mpi-detach.h"
 #include "../timing.h"
 
-void Detach_callback(void *data, MPI_Request *req) { omp_fulfill_event(data); }
-void Detach_all_callback(void *data, int count, MPI_Request req[]) {
-  omp_fulfill_event(data);
+void Detach_callback(void *data, MPI_Request *req)
+{
+  omp_fulfill_event((omp_event_handle_t)(data));
+}
+
+void Detach_all_callback(void *data, int count, MPI_Request req[])
+{
+  omp_fulfill_event((omp_event_handle_t)(data));
 }
 
 static int
@@ -57,32 +62,35 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
             EXTRAE_ENTER(EVENT_POTRF);
             START_TIMING(TIME_POTRF);
 //            if (k%10)
-              printf("Executing omp_potrf(A[%i][%i])\n",k,k);
+            printf("Executing omp_potrf(A[%i][%i])\n",k,k);
             omp_potrf(A[k][k], ts, ts);
+            printf("finish omp_potrf(A[%i][%i])\n",k,k);
             END_TIMING(TIME_POTRF);
             EXTRAE_EXIT(EVENT_POTRF);
           }
         }
 
-        if (block_rank[k * nt + k] == mype && np != 1) {
+        if (block_rank[k * nt + k] == mype && np != 1)
+        {
           omp_event_handle_t event_handle;
-#pragma omp task depend(in                                                     \
-                        : A[k][k]) firstprivate(k)                             \
-    depend(in                                                                  \
-           : comm_round_sentinel) detach(event_handle)
+          #pragma omp task depend(in:A[k][k]) firstprivate(k) depend(in:comm_round_sentinel) detach(event_handle)
           {
             START_TIMING(TIME_COMM);
             MPI_Request reqs[np];
             int nreqs = 0;
-            for (int dst = 0; dst < np; dst++) {
+            for (int dst = 0; dst < np; dst++)
+            {
               int send_flag = 0;
-              for (int kk = k + 1; kk < nt; kk++) {
-                if (dst == block_rank[k * nt + kk]) {
+              for (int kk = k + 1; kk < nt; kk++)
+              {
+                if (dst == block_rank[k * nt + kk])
+                {
                   send_flag = 1;
                   break;
                 }
               }
-              if (send_flag && dst != mype) {
+              if (send_flag && dst != mype)
+              {
                 MPI_Request send_req;
                 MPI_Isend(A[k][k], ts * ts, MPI_DOUBLE, dst, k * nt + k,
                           MPI_COMM_WORLD, &send_req);
@@ -96,17 +104,17 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
           }
         }
 
-        if (block_rank[k * nt + k] != mype) {
-          for (int i = k + 1; i < nt; i++) {
+        if (block_rank[k * nt + k] != mype)
+        {
+          for (int i = k + 1; i < nt; i++)
+          {
             if (block_rank[k * nt + i] == mype)
               recv_flag = 1;
           }
-          if (recv_flag) {
+          if (recv_flag)
+          {
             omp_event_handle_t event_handle;
-#pragma omp task depend(out                                                    \
-                        : B) firstprivate(k) depend(in                         \
-                                                    : comm_round_sentinel)     \
-    detach(event_handle) // untied
+            #pragma omp task depend(out:B) firstprivate(k) depend(in:comm_round_sentinel) detach(event_handle) // untied
             {
               START_TIMING(TIME_COMM);
               MPI_Request recv_req;
@@ -128,11 +136,14 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
         }
 #endif
 
-        for (int i = k + 1; i < nt; i++) {
-          if (block_rank[k * nt + i] == mype) {
+        for (int i = k + 1; i < nt; i++)
+        {
+          if (block_rank[k * nt + i] == mype)
+          {
             num_comp_tasks++;
-            if (block_rank[k * nt + k] == mype) {
-#pragma omp task depend(in : A[k][k]) depend(out : A[k][i]) firstprivate(k, i)
+            if (block_rank[k * nt + k] == mype)
+            {
+              #pragma omp task depend(in : A[k][k]) depend(out : A[k][i]) firstprivate(k, i)
               {
                 EXTRAE_ENTER(EVENT_TRSM);
                 START_TIMING(TIME_TRSM);
@@ -140,8 +151,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B,
                 END_TIMING(TIME_TRSM);
                 EXTRAE_EXIT(EVENT_TRSM);
               }
-            } else {
-#pragma omp task depend(in : B) depend(out : A[k][i]) firstprivate(k, i)
+            } else
+            {
+              #pragma omp task depend(in : B) depend(out : A[k][i]) firstprivate(k, i)
               {
                 EXTRAE_ENTER(EVENT_TRSM);
                 START_TIMING(TIME_TRSM);

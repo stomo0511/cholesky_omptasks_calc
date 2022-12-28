@@ -1,0 +1,4 @@
+CC = mpiicc -cc=icx
+MPICXX = mpiicpc -cc=icpx
+CFLAGS  += -I${MKLROOT}/include -O3 -I./ -std=gnu99  -fopenmp -g
+LDFLAGS += -L$(MKLROOT)/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm
