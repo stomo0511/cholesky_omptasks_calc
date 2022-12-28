@@ -25,11 +25,12 @@ endif
 
 #all : ch_$(TARGET)_fine ch_$(TARGET)_fine_extrae ch_$(TARGET)_fine_timing
 all : ch_$(TARGET)_fine ch_$(TARGET)_fine_timing ch_$(TARGET)_fine_poll
+
 ch_$(TARGET)_fine: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
 	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -L. -Wl,--rpath,$(PWD) -ldetach_$(TARGET)
 
-ch_$(TARGET)_fine_extrae: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
-	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_EXTRAE $(EXTRAE_FLAGS) -L. -Wl,--rpath,$(PWD) -ldetach_$(TARGET)
+# ch_$(TARGET)_fine_extrae: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
+#	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_EXTRAE $(EXTRAE_FLAGS) -L. -Wl,--rpath,$(PWD) -ldetach_$(TARGET)
 
 ch_$(TARGET)_fine_timing: $(SRC) ch_common.c Makefile libdetach_$(TARGET).so
 	$(CC) $(CFLAGS) -o $@ $(SRC) -g $(LDFLAGS) -DUSE_TIMING -L. -Wl,--rpath,$(PWD) -ldetach_$(TARGET)
