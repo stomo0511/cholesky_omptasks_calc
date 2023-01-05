@@ -21,18 +21,21 @@ void omp_potrf(double * const A, int ts, int ld)
     static const char L = 'L';
     dpotrf_(&L, &ts, A, &ld, &INFO);
 }
+
 void omp_trsm(double *A, double *B, int ts, int ld)
 {
     static char LO = 'L', TR = 'T', NU = 'N', RI = 'R';
     static double DONE = 1.0;
     dtrsm_(&RI, &LO, &TR, &NU, &ts, &ts, &DONE, A, &ld, B, &ld );
 }
+
 void omp_gemm(double *A, double *B, double *C, int ts, int ld)
 {
     static const char TR = 'T', NT = 'N';
     static double DONE = 1.0, DMONE = -1.0;
     dgemm_(&NT, &TR, &ts, &ts, &ts, &DMONE, A, &ld, B, &ld, &DONE, C, &ld);
 }
+
 void omp_syrk(double *A, double *B, int ts, int ld)
 {
     static char LO = 'L', NT = 'N';
@@ -42,51 +45,91 @@ void omp_syrk(double *A, double *B, int ts, int ld)
 
 void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 {
-    for (int k = 0; k < nt; k++) {
-
-#pragma omp task depend(out: A[k][k])
-{
-        omp_potrf(A[k][k], ts, ts);
-#ifdef DEBUG
-        if (mype == 0) printf("potrf:out:A[%d][%d]\n", k, k);
-#endif
-}
-        for (int i = k + 1; i < nt; i++) {
-
-#pragma omp task depend(in: A[k][k]) depend(out: A[k][i])
-{
-            omp_trsm(A[k][k], A[k][i], ts, ts);
-#ifdef DEBUG
-        if (mype == 0) printf("trsm :in:A[%d][%d]:out:A[%d][%d]\n", k, k, k, i);
-#endif
-}
+    for (int k = 0; k < nt; k++)
+    {
+        // POTRF
+        #pragma omp task depend(out: A[k][k])
+        {
+            omp_potrf(A[k][k], ts, ts);
+            #ifdef DEBUG
+            if (mype == 0) printf("potrf:out:A[%d][%d]\n", k, k);
+            #endif
         }
-        for (int i = k + 1; i < nt; i++) {
-            for (int j = k + 1; j < i; j++) {
 
-#pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
-{
-                omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
-#ifdef DEBUG
-                if (mype == 0) printf("gemm :in:A[%d][%d]:A[%d][%d]:out:A[%d][%d]\n", k, i, k, j, j, i);
-#endif
-}
+        for (int i = k + 1; i < nt; i++)
+        {
+            // TRSM
+            #pragma omp task depend(in: A[k][k]) depend(out: A[k][i])
+            {
+                omp_trsm(A[k][k], A[k][i], ts, ts);
+                #ifdef DEBUG
+                if (mype == 0) printf("trsm :in:A[%d][%d]:out:A[%d][%d]\n", k, k, k, i);
+                #endif
             }
-#pragma omp task depend(in: A[k][i]) depend(out: A[i][i])
-{
-            omp_syrk(A[k][i], A[i][i], ts, ts);
-#ifdef DEBUG
-            if (mype == 0) printf("syrk :in:A[%d][%d]:out:A[%d][%d]\n", k, i, i, i);
-#endif
-}
         }
-    }
-#pragma omp taskwait
+
+        for (int i = k + 1; i < nt; i++)
+        {
+            for (int j = k + 1; j < i; j++)
+            {
+                #pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
+                {
+                    omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
+                    #ifdef DEBUG
+                    if (mype == 0) printf("gemm :in:A[%d][%d]:A[%d][%d]:out:A[%d][%d]\n", k, i, k, j, j, i);
+                    #endif
+                }
+            }
+
+            #pragma omp task depend(in: A[k][i]) depend(out: A[i][i])
+            {
+                omp_syrk(A[k][i], A[i][i], ts, ts);
+                #ifdef DEBUG
+                if (mype == 0) printf("syrk :in:A[%d][%d]:out:A[%d][%d]\n", k, i, i, i);
+                #endif
+            }
+        }
+    } // End of K-loop
+    #pragma omp taskwait
 }
 
 inline void reset_send_flags(char *send_flags)
 {
     for (int i = 0; i < np; i++) send_flags[i] = 0;
+}
+
+static void get_block_rank(int *block_rank, int nt)
+{
+    int row, col;
+    row = col = np;
+    int blocks[np];
+    for (int i=0; i<np; i++)
+        blocks[i]=0;
+
+    if (np != 1) {
+        while (1) {
+            row = row / 2;
+            if (row * col == np) break;
+            col = col / 2;
+            if (row * col == np) break;
+        }
+    }
+    if (mype == 0) printf("row = %d, col = %d\n", row, col);
+
+    int i, j, tmp_rank = 0, offset = 0;
+    for (i = 0; i < nt; i++) {
+        for (j = 0; j < nt; j++) {
+            block_rank[i*nt + j] = tmp_rank + offset;
+            blocks[tmp_rank + offset]++;
+            tmp_rank++;
+            if (tmp_rank >= col) tmp_rank = 0;
+        }
+        tmp_rank = 0;
+        offset = (offset + col >= np) ? 0 : offset + col;
+    }
+    if (mype == 0) 
+      for (int i=0; i<np; i++)
+        printf("blocks[%i]=%i\n", i, blocks[i]);
 }
 
 int main(int argc, char *argv[])
@@ -129,7 +172,7 @@ int main(int argc, char *argv[])
     int *block_rank = malloc(nt * nt * sizeof(int));
     get_block_rank(block_rank, nt);
 
-#ifdef DEBUG
+    #ifdef DEBUG
     if (mype == 0) {
         for (int i = 0; i < nt; i++) {
             for (int j = 0; j < nt; j++) {
@@ -138,54 +181,69 @@ int main(int argc, char *argv[])
             printf("\n");
         }
     }
-#endif
+    #endif
 
     double *A[nt][nt], *B, *C[nt], *Ans[nt][nt];
 
-#pragma omp parallel
-#pragma omp single
-{
-  for (int i = 0; i < nt; i++) {
-    for (int j = 0; j < nt; j++) {
+    // #pragma omp parallel
+    // #pragma omp single
+    {
+        for (int i = 0; i < nt; i++)
+        {
+            for (int j = 0; j < nt; j++)
+            {
+                #pragma omp task depend(out: A[i][j]) shared(Ans, A)
+                {
+                    if (check)
+                    {
+                        // MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &Ans[i][j]);
+                        Ans[i][j] =  (double*)malloc(sizeof(double) * ts*ts);
+                        initialize_tile(ts, Ans[i][j]);
+                    }
+                    if (block_rank[i*nt+j] == mype)
+                    {
+                        // MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &A[i][j]);
+                        A[i][j] =  (double*)malloc(sizeof(double) * ts*ts);
+                        if (!check)
+                        {
+                            initialize_tile(ts, A[i][j]);
+                        }
+                        else
+                        {
+                            for (int k = 0; k < ts * ts; k++)
+                            {
+                                A[i][j][k] = Ans[i][j][k];
+                            }
+                        }
+                    }
+                }
+            }
 
-#pragma omp task depend(out: A[i][j]) shared(Ans, A)
-{
-      if (check) {
-        MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &Ans[i][j]);
-        initialize_tile(ts, Ans[i][j]);
-      }
-      if (block_rank[i*nt+j] == mype) {
-        MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &A[i][j]);
-        if (!check) {
-          initialize_tile(ts, A[i][j]);
-        } else {
-          for (int k = 0; k < ts * ts; k++) {
-            A[i][j][k] = Ans[i][j][k];
-          }
-        }
-      }
-}
+            #pragma omp task depend(inout: A[i][i]) shared(Ans, A)
+            {
+                // add to diagonal
+                if (check)
+                {
+                    Ans[i][i][ts/2*ts+ts/2] = (double)nt;
+                }
+                if (block_rank[i*nt+i] == mype)
+                {
+                    A[i][i][ts/2*ts+ts/2] = (double)nt;
+                }
+            }
+        } // End of I-loop
+      // omp single
+    } // omp parallel
+
+    // MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &B);
+    B =  (double*)malloc(sizeof(double) * ts*ts);
+    for (int i = 0; i < nt; i++)
+    {
+        // MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &C[i]);
+        C[i] =  (double*)malloc(sizeof(double) * ts*ts);
     }
 
-#pragma omp task depend(inout: A[i][i]) shared(Ans, A)
-{
-    // add to diagonal
-    if (check) {
-      Ans[i][i][ts/2*ts+ts/2] = (double)nt;
-    }
-    if (block_rank[i*nt+i] == mype) {
-      A[i][i][ts/2*ts+ts/2] = (double)nt;
-    }
-}
-  }
-// omp single
-} // omp parallel
-
-  MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &B);
-  for (int i = 0; i < nt; i++) {
-    MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &C[i]);
-  }
-
+//////////////////////// HERE HERE HERE ///////////////////////
 #pragma omp parallel
 #pragma omp single
     num_threads = NUM_THREADS;
@@ -242,38 +300,4 @@ int main(int argc, char *argv[])
     MPI_Finalize();
 
     return 0;
-}
-
-static void get_block_rank(int *block_rank, int nt)
-{
-    int row, col;
-    row = col = np;
-    int blocks[np];
-    for (int i=0; i<np; i++)
-        blocks[i]=0;
-
-    if (np != 1) {
-        while (1) {
-            row = row / 2;
-            if (row * col == np) break;
-            col = col / 2;
-            if (row * col == np) break;
-        }
-    }
-    if (mype == 0) printf("row = %d, col = %d\n", row, col);
-
-    int i, j, tmp_rank = 0, offset = 0;
-    for (i = 0; i < nt; i++) {
-        for (j = 0; j < nt; j++) {
-            block_rank[i*nt + j] = tmp_rank + offset;
-            blocks[tmp_rank + offset]++;
-            tmp_rank++;
-            if (tmp_rank >= col) tmp_rank = 0;
-        }
-        tmp_rank = 0;
-        offset = (offset + col >= np) ? 0 : offset + col;
-    }
-    if (mype == 0) 
-      for (int i=0; i<np; i++)
-        printf("blocks[%i]=%i\n", i, blocks[i]);
 }
