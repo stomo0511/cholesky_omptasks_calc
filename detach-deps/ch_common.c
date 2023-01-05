@@ -45,52 +45,57 @@ void omp_syrk(double *A, double *B, int ts, int ld)
 
 void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 {
-    for (int k = 0; k < nt; k++)
+    #pragma omp parallel
+    #pragma omp single
     {
-        // POTRF
-        #pragma omp task depend(out: A[k][k])
+        for (int k = 0; k < nt; k++)
         {
-            omp_potrf(A[k][k], ts, ts);
-            #ifdef DEBUG
-            if (mype == 0) printf("potrf:out:A[%d][%d]\n", k, k);
-            #endif
-        }
-
-        for (int i = k + 1; i < nt; i++)
-        {
-            // TRSM
-            #pragma omp task depend(in: A[k][k]) depend(out: A[k][i])
+            // POTRF
+            #pragma omp task depend(out: A[k][k])
             {
-                omp_trsm(A[k][k], A[k][i], ts, ts);
+                omp_potrf(A[k][k], ts, ts);
                 #ifdef DEBUG
-                if (mype == 0) printf("trsm :in:A[%d][%d]:out:A[%d][%d]\n", k, k, k, i);
+                if (mype == 0) printf("potrf:out:A[%d][%d]\n", k, k);
                 #endif
             }
-        }
 
-        for (int i = k + 1; i < nt; i++)
-        {
-            for (int j = k + 1; j < i; j++)
+            for (int i = k + 1; i < nt; i++)
             {
-                #pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
+                // TRSM
+                #pragma omp task depend(in: A[k][k]) depend(out: A[k][i])
                 {
-                    omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
+                    omp_trsm(A[k][k], A[k][i], ts, ts);
                     #ifdef DEBUG
-                    if (mype == 0) printf("gemm :in:A[%d][%d]:A[%d][%d]:out:A[%d][%d]\n", k, i, k, j, j, i);
+                    if (mype == 0) printf("trsm :in:A[%d][%d]:out:A[%d][%d]\n", k, k, k, i);
                     #endif
                 }
             }
 
-            #pragma omp task depend(in: A[k][i]) depend(out: A[i][i])
+            for (int i = k + 1; i < nt; i++)
             {
-                omp_syrk(A[k][i], A[i][i], ts, ts);
-                #ifdef DEBUG
-                if (mype == 0) printf("syrk :in:A[%d][%d]:out:A[%d][%d]\n", k, i, i, i);
-                #endif
+                for (int j = k + 1; j < i; j++)
+                {
+                    #pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
+                    {
+                        omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
+                        #ifdef DEBUG
+                        if (mype == 0) printf("gemm :in:A[%d][%d]:A[%d][%d]:out:A[%d][%d]\n", k, i, k, j, j, i);
+                        #endif
+                    }
+                }
+
+                #pragma omp task depend(in: A[k][i]) depend(out: A[i][i])
+                {
+                    omp_syrk(A[k][i], A[i][i], ts, ts);
+                    #ifdef DEBUG
+                    if (mype == 0) printf("syrk :in:A[%d][%d]:out:A[%d][%d]\n", k, i, i, i);
+                    #endif
+                }
             }
-        }
-    } // End of K-loop
-    #pragma omp taskwait
+        } // End of K-loop
+        #pragma omp taskwait
+      // single region
+    } // parallel region
 }
 
 inline void reset_send_flags(char *send_flags)
@@ -185,8 +190,8 @@ int main(int argc, char *argv[])
 
     double *A[nt][nt], *B, *C[nt], *Ans[nt][nt];
 
-    // #pragma omp parallel
-    // #pragma omp single
+    #pragma omp parallel
+    #pragma omp single
     {
         for (int i = 0; i < nt; i++)
         {
@@ -243,9 +248,6 @@ int main(int argc, char *argv[])
         C[i] =  (double*)malloc(sizeof(double) * ts*ts);
     }
 
-//////////////////////// HERE HERE HERE ///////////////////////
-#pragma omp parallel
-#pragma omp single
     num_threads = NUM_THREADS;
 
     const float t3 = get_time();

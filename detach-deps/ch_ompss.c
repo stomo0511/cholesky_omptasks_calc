@@ -15,13 +15,6 @@
 //#warning "Compiling for OMPSS"
 //#endif
 
-#ifdef USE_NANOS6
-#include "nanos6.h"
-int omp_fulfill_event(void* arg){
-  nanos6_decrease_task_event_counter(arg, 1);
-}
-#endif
-
 void Detach_callback(void * data, MPI_Request * req)
 {
 	omp_fulfill_event((omp_event_handle_t)(data));
@@ -48,10 +41,8 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 	int num_comp_tasks = 0;
 	reset_send_flags(send_flags);
 
-#ifndef USE_NANOS6
 #pragma omp parallel
 #pragma omp single
-#endif
 {
 
 	START_TIMING(TIME_TOTAL);
@@ -61,20 +52,12 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 		int send_tasks = 0, recv_tasks = 0;
 		// sentinel task to limit communication task parallelism
 #ifdef HAVE_COMM_SENTINEL
-#ifdef USE_NANOS6
-#pragma oss task depend(out: comm_round_sentinel)
-#else
 #pragma omp task depend(out: comm_round_sentinel)
-#endif
 		{ if (comm_round_sentinel < 0) comm_round_sentinel = 0; }
 #endif // HAVE_COMM_SENTINEL
 		if (block_rank[k*nt+k] == mype) {
 			num_comp_tasks++;
-#ifdef USE_NANOS6
-#pragma oss task depend(out: A[k][k]) firstprivate(k)
-#else
 #pragma omp task depend(out: A[k][k]) firstprivate(k)
-#endif
 {
 			EXTRAE_ENTER(EVENT_POTRF);
 			START_TIMING(TIME_POTRF);
@@ -85,16 +68,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 		}
 
 		if (block_rank[k*nt+k] == mype && np != 1) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][k]) firstprivate(k) depend(in: comm_round_sentinel) untied
-{
-			void * event_handle = nanos6_get_current_event_counter();
-			nanos6_increase_current_task_event_counter(event_handle, 1);
-#else
 					   omp_event_handle_t event_handle;
 #pragma omp task depend(in: A[k][k]) firstprivate(k) depend(in: comm_round_sentinel) detach(event_handle)
 {
-#endif
 			START_TIMING(TIME_COMM);
 			MPI_Request reqs[np];
 			int nreqs = 0;
@@ -120,16 +96,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 				if (block_rank[k*nt+i] == mype) recv_flag = 1;
 			}
 			if (recv_flag) {
-#ifdef USE_NANOS6
-#pragma oss task depend(out: B) firstprivate(k) depend(in: comm_round_sentinel) untied 
-{
-			void * event_handle = nanos6_get_current_event_counter();
-			nanos6_increase_current_task_event_counter(event_handle, 1);
-#else
 					   omp_event_handle_t event_handle;
 #pragma omp task depend(out: B) firstprivate(k) depend(in: comm_round_sentinel) detach(event_handle)// untied
 {
-#endif
 			START_TIMING(TIME_COMM);
 				MPI_Request recv_req;
 				MPI_Irecv(B, ts*ts, MPI_DOUBLE, block_rank[k*nt+k], k*nt+k, MPI_COMM_WORLD, &recv_req);
@@ -142,11 +111,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 
 #ifdef HAVE_INTERMEDIATE_COMM_SENTINEL
 		// sentinel task to limit communication task parallelism
-#ifdef USE_NANOS6
-#pragma oss task depend(out: comm_round_sentinel)
-#else
 #pragma omp task depend(out: comm_round_sentinel)
-#endif
 		{ if (comm_round_sentinel < 0) comm_round_sentinel = 0; }
 #endif
 
@@ -154,11 +119,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 			if (block_rank[k*nt+i] == mype) {
 				num_comp_tasks++;
 				if (block_rank[k*nt+k] == mype) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][k]) depend(out: A[k][i]) firstprivate(k, i)
-#else
 #pragma omp task depend(in: A[k][k]) depend(out: A[k][i]) firstprivate(k, i)
-#endif
 {
 					EXTRAE_ENTER(EVENT_TRSM);
 					START_TIMING(TIME_TRSM);
@@ -167,11 +128,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 					EXTRAE_EXIT(EVENT_TRSM);
 }
 				} else {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: B) depend(out: A[k][i]) firstprivate(k, i)
-#else
 #pragma omp task depend(in: B) depend(out: A[k][i]) firstprivate(k, i)
-#endif
 {
 					EXTRAE_ENTER(EVENT_TRSM);
 					START_TIMING(TIME_TRSM);
@@ -194,16 +151,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 					if (send_flags[dst] && dst != mype) {
 					   send_tasks++;
 					   num_send_tasks++;
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i]) firstprivate(k, i, dst) depend(in: comm_round_sentinel) untied 
-{
-			void * event_handle = nanos6_get_current_event_counter();
-			nanos6_increase_current_task_event_counter(event_handle, 1);
-#else
 					   omp_event_handle_t event_handle;
 #pragma omp task depend(in: A[k][i]) firstprivate(k, i, dst) depend(in: comm_round_sentinel) detach(event_handle) //untied 
 {
-#endif
 			START_TIMING(TIME_COMM);
 						MPI_Request send_req;
 						MPI_Isend(A[k][i], ts*ts, MPI_DOUBLE, dst, k*nt+i, MPI_COMM_WORLD, &send_req);
@@ -225,16 +175,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 				if (recv_flag) {
 					recv_tasks++;
 					num_recv_tasks++;
-#ifdef USE_NANOS6
-#pragma oss task depend(out: C[i]) firstprivate(k, i) depend(in: comm_round_sentinel) untied
-{
-			void * event_handle = nanos6_get_current_event_counter();
-			nanos6_increase_current_task_event_counter(event_handle, 1);
-#else
 					   omp_event_handle_t event_handle;
 #pragma omp task depend(out: C[i]) firstprivate(k, i) depend(in: comm_round_sentinel) detach(event_handle)
 {
-#endif
 			START_TIMING(TIME_COMM);
 					MPI_Request recv_req;
 					MPI_Irecv(C[i], ts*ts, MPI_DOUBLE, block_rank[k*nt+i], k*nt+i, MPI_COMM_WORLD, &recv_req);
@@ -257,11 +200,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 				if (block_rank[j*nt+i] == mype) {
 					num_comp_tasks++;
 					if (block_rank[k*nt+i] == mype && block_rank[k*nt+j] == mype) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#else
 #pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#endif
 {
 						EXTRAE_ENTER(EVENT_GEMM);
 						START_TIMING(TIME_GEMM);
@@ -270,11 +209,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 						EXTRAE_EXIT(EVENT_GEMM);
 }
 					} else if (block_rank[k*nt+i] != mype && block_rank[k*nt+j] == mype) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: C[i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#else
 #pragma omp task depend(in: C[i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#endif
 {
 						EXTRAE_ENTER(EVENT_GEMM);
 						START_TIMING(TIME_GEMM);
@@ -283,11 +218,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 						EXTRAE_EXIT(EVENT_GEMM);
 }
 					} else if (block_rank[k*nt+i] == mype && block_rank[k*nt+j] != mype) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#else
 #pragma omp task depend(in: A[k][i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#endif
 {
 						EXTRAE_ENTER(EVENT_GEMM);
 						START_TIMING(TIME_GEMM);
@@ -296,11 +227,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 						EXTRAE_EXIT(EVENT_GEMM);
 }
 					} else {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: C[i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#else
 #pragma omp task depend(in: C[i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
-#endif
 {
 						EXTRAE_ENTER(EVENT_GEMM);
 						START_TIMING(TIME_GEMM);
@@ -315,11 +242,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 			if (block_rank[i*nt+i] == mype) {
 				num_comp_tasks++;
 				if (block_rank[k*nt+i] == mype) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i]) depend(out: A[i][i]) firstprivate(k, i)
-#else
 #pragma omp task depend(in: A[k][i]) depend(out: A[i][i]) firstprivate(k, i)
-#endif
 {
 					EXTRAE_ENTER(EVENT_SYRK);
 					START_TIMING(TIME_SYRK);
@@ -328,11 +251,7 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 					EXTRAE_EXIT(EVENT_SYRK);
 }
 				} else {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: C[i]) depend(out: A[i][i]) firstprivate(k, i)
-#else
 #pragma omp task depend(in: C[i]) depend(out: A[i][i]) firstprivate(k, i)
-#endif
 {
 					EXTRAE_ENTER(EVENT_SYRK);
 					START_TIMING(TIME_SYRK);
@@ -346,11 +265,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 	}
 	END_TIMING(TIME_CREATE);
 	}
-#ifdef USE_NANOS6
-#pragma oss taskwait
-#else
+
 #pragma omp taskwait
-#endif
+
 	END_TIMING(TIME_TOTAL);
 	MPI_Barrier(MPI_COMM_WORLD);
 // pragma omp single
