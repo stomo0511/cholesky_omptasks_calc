@@ -43,11 +43,8 @@ void omp_syrk(double *A, double *B, int ts, int ld)
 void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 {
     for (int k = 0; k < nt; k++) {
-#ifdef USE_NANOS6
-#pragma oss task depend(out: A[k][k])
-#else
+
 #pragma omp task depend(out: A[k][k])
-#endif
 {
         omp_potrf(A[k][k], ts, ts);
 #ifdef DEBUG
@@ -55,11 +52,8 @@ void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 #endif
 }
         for (int i = k + 1; i < nt; i++) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][k]) depend(out: A[k][i])
-#else
+
 #pragma omp task depend(in: A[k][k]) depend(out: A[k][i])
-#endif
 {
             omp_trsm(A[k][k], A[k][i], ts, ts);
 #ifdef DEBUG
@@ -69,11 +63,8 @@ void cholesky_single(const int ts, const int nt, double* A[nt][nt])
         }
         for (int i = k + 1; i < nt; i++) {
             for (int j = k + 1; j < i; j++) {
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
-#else
+
 #pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i])
-#endif
 {
                 omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
 #ifdef DEBUG
@@ -81,11 +72,7 @@ void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 #endif
 }
             }
-#ifdef USE_NANOS6
-#pragma oss task depend(in: A[k][i]) depend(out: A[i][i])
-#else
 #pragma omp task depend(in: A[k][i]) depend(out: A[i][i])
-#endif
 {
             omp_syrk(A[k][i], A[i][i], ts, ts);
 #ifdef DEBUG
@@ -94,11 +81,7 @@ void cholesky_single(const int ts, const int nt, double* A[nt][nt])
 }
         }
     }
-#ifdef USE_NANOS6
-#pragma oss taskwait
-#else
 #pragma omp taskwait
-#endif
 }
 
 inline void reset_send_flags(char *send_flags)
@@ -159,22 +142,13 @@ int main(int argc, char *argv[])
 
     double *A[nt][nt], *B, *C[nt], *Ans[nt][nt];
 
-#ifdef USE_NANOS6
-  #ifdef USE_POLLING
-    nanos6_register_polling_service("MPI_Progress", MPIX_Progress, NULL);
-  #endif
-#else
 #pragma omp parallel
 #pragma omp single
-#endif
 {
   for (int i = 0; i < nt; i++) {
     for (int j = 0; j < nt; j++) {
-#ifdef USE_NANOS6
-#pragma oss task depend(out: A[i][j]) shared(Ans, A)
-#else
+
 #pragma omp task depend(out: A[i][j]) shared(Ans, A)
-#endif
 {
       if (check) {
         MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &Ans[i][j]);
@@ -192,11 +166,8 @@ int main(int argc, char *argv[])
       }
 }
     }
-#ifdef USE_NANOS6
-#pragma oss task depend(inout: A[i][i]) shared(Ans, A)
-#else
+
 #pragma omp task depend(inout: A[i][i]) shared(Ans, A)
-#endif
 {
     // add to diagonal
     if (check) {
@@ -215,11 +186,8 @@ int main(int argc, char *argv[])
     MPI_Alloc_mem(ts * ts * sizeof(double), MPI_INFO_NULL, &C[i]);
   }
 
-#ifdef USE_NANOS6
-#else
 #pragma omp parallel
 #pragma omp single
-#endif
     num_threads = NUM_THREADS;
 
     const float t3 = get_time();
