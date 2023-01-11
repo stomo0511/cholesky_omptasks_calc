@@ -64,11 +64,9 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 					num_comp_tasks++;
 					#pragma omp task depend(out: A[k][k]) firstprivate(k)
 					{
-						EXTRAE_ENTER(EVENT_POTRF);
 						START_TIMING(TIME_POTRF);
 						omp_potrf(A[k][k], ts, ts);
 						END_TIMING(TIME_POTRF);
-						EXTRAE_EXIT(EVENT_POTRF);
 					}
 				}
 
@@ -147,22 +145,18 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 						{
 							#pragma omp task depend(in: A[k][k]) depend(out: A[k][i]) firstprivate(k, i)
 							{
-								EXTRAE_ENTER(EVENT_TRSM);
 								START_TIMING(TIME_TRSM);
 								omp_trsm(A[k][k], A[k][i], ts, ts);
 								END_TIMING(TIME_TRSM);
-								EXTRAE_EXIT(EVENT_TRSM);
 							}
 						}
 						else
 						{
 							#pragma omp task depend(in: B) depend(out: A[k][i]) firstprivate(k, i)
 							{
-								EXTRAE_ENTER(EVENT_TRSM);
 								START_TIMING(TIME_TRSM);
 								omp_trsm(B, A[k][i], ts, ts);
 								END_TIMING(TIME_TRSM);
-								EXTRAE_EXIT(EVENT_TRSM);
 							}
 						}
 					}
@@ -249,43 +243,35 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 							{
 								#pragma omp task depend(in: A[k][i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
 								{
-									EXTRAE_ENTER(EVENT_GEMM);
 									START_TIMING(TIME_GEMM);
 									omp_gemm(A[k][i], A[k][j], A[j][i], ts, ts);
 									END_TIMING(TIME_GEMM);
-									EXTRAE_EXIT(EVENT_GEMM);
 								}
 							}
 							else if (block_rank[k*nt+i] != mype && block_rank[k*nt+j] == mype)
 							{
 								#pragma omp task depend(in: C[i], A[k][j]) depend(out: A[j][i]) firstprivate(k, j, i)
 								{
-									EXTRAE_ENTER(EVENT_GEMM);
 									START_TIMING(TIME_GEMM);
 									omp_gemm(C[i], A[k][j], A[j][i], ts, ts);
 									END_TIMING(TIME_GEMM);
-									EXTRAE_EXIT(EVENT_GEMM);
 								}
 							} else if (block_rank[k*nt+i] == mype && block_rank[k*nt+j] != mype)
 							{
 								#pragma omp task depend(in: A[k][i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
 								{
-									EXTRAE_ENTER(EVENT_GEMM);
 									START_TIMING(TIME_GEMM);
 									omp_gemm(A[k][i], C[j], A[j][i], ts, ts);
 									END_TIMING(TIME_GEMM);
-									EXTRAE_EXIT(EVENT_GEMM);
 								}
 							}
 							else
 							{
 								#pragma omp task depend(in: C[i], C[j]) depend(out: A[j][i]) firstprivate(k, j, i)
 								{
-									EXTRAE_ENTER(EVENT_GEMM);
 									START_TIMING(TIME_GEMM);
 									omp_gemm(C[i], C[j], A[j][i], ts, ts);
 									END_TIMING(TIME_GEMM);
-									EXTRAE_EXIT(EVENT_GEMM);
 								}
 							}
 						}
@@ -298,22 +284,18 @@ void cholesky_mpi(const int ts, const int nt, double *A[nt][nt], double *B, doub
 						{
 							#pragma omp task depend(in: A[k][i]) depend(out: A[i][i]) firstprivate(k, i)
 							{
-								EXTRAE_ENTER(EVENT_SYRK);
 								START_TIMING(TIME_SYRK);
 								omp_syrk(A[k][i], A[i][i], ts, ts);
 								END_TIMING(TIME_SYRK);
-								EXTRAE_EXIT(EVENT_SYRK);
 							}
 						}
 						else
 						{
 							#pragma omp task depend(in: C[i]) depend(out: A[i][i]) firstprivate(k, i)
 							{
-								EXTRAE_ENTER(EVENT_SYRK);
 								START_TIMING(TIME_SYRK);
 								omp_syrk(C[i], A[i][i], ts, ts);
 								END_TIMING(TIME_SYRK);
-								EXTRAE_EXIT(EVENT_SYRK);
 							}
 						}
 					}
